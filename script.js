@@ -14,6 +14,25 @@ const dialogMeta = document.querySelector("#dialog-meta");
 const sortSelect = document.querySelector("#sort-select");
 let activeCategory = "all";
 const favorites = new Set();
+const renderProbe = document.createElement("canvas");
+renderProbe.width = 64;
+renderProbe.height = 64;
+const renderContext = renderProbe.getContext("2d", { willReadFrequently: true });
+renderContext.font = "48px serif";
+renderContext.textAlign = "center";
+renderContext.textBaseline = "middle";
+const missingGlyphBitmap = (() => {
+  renderContext.clearRect(0, 0, renderProbe.width, renderProbe.height);
+  renderContext.fillText("\u{10FFFF}", renderProbe.width / 2, renderProbe.height / 2);
+  return new Uint32Array(renderContext.getImageData(0, 0, renderProbe.width, renderProbe.height).data.buffer);
+})();
+function canRenderGlyph(glyph) {
+  renderContext.clearRect(0, 0, renderProbe.width, renderProbe.height);
+  renderContext.fillText(glyph, renderProbe.width / 2, renderProbe.height / 2);
+  const bitmap = new Uint32Array(renderContext.getImageData(0, 0, renderProbe.width, renderProbe.height).data.buffer);
+  return bitmap.some((pixel, index) => pixel !== missingGlyphBitmap[index]);
+}
+const renderableGlyphs = glyphs.filter((item) => canRenderGlyph(item[0]));
 function renderCategories() {
   document.querySelector("#category-list").innerHTML = sidebarOptions.map(([id, icon, label]) => `<button class="category-button ${id === activeCategory ? "active" : ""}" data-category="${id}" type="button"><span class="category-icon">${icon}</span><span>${label}</span></button>`).join("");
   document.querySelectorAll(".category-button").forEach((button) => button.addEventListener("click", () => { activeCategory = button.dataset.category; renderCategories(); renderGlyphs(); }));
@@ -21,7 +40,7 @@ function renderCategories() {
 function visibleGlyphs() {
   const query = searchInput.value.trim().toLowerCase();
   const active = sidebarOptions.find(([id]) => id === activeCategory);
-  return glyphs.filter((item) => {
+  return renderableGlyphs.filter((item) => {
     const [, name, category, code, block, blockFamily, , composeSequences] = item;
     const matchesCategory = activeCategory === "all" ? !item[8] : (active[3] === "union" ? (category === active[4][0] || blockFamily === active[4][1]) : active[3] === "semantic" ? category === active[4] : blockFamily === active[4]);
     const composeText = composeSequences.join(" ").toLowerCase();
@@ -66,5 +85,5 @@ searchInput.addEventListener("input", renderGlyphs);
 sortSelect.addEventListener("change", renderGlyphs);
 document.querySelector("#random-button").addEventListener("click", () => { const items = visibleGlyphs(); if (items.length) { const item = items[Math.floor(Math.random() * items.length)]; copyGlyph(item[0], item[1], item[3]); } });
 document.addEventListener("keydown", (event) => { if (event.key === "/" && document.activeElement !== searchInput) { event.preventDefault(); searchInput.focus(); } });
-document.querySelector(".eyebrow").innerHTML = `<span class="pulse"></span> ${glyphs.filter((item) => !item[8]).length.toLocaleString()} glyphs grouped by meaning and Unicode family`;
+document.querySelector(".eyebrow").innerHTML = `<span class="pulse"></span> ${renderableGlyphs.filter((item) => !item[8]).length.toLocaleString()} glyphs grouped by meaning and Unicode family`;
 renderCategories(); renderGlyphs();
