@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbfcf8" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#111318" />
+    <title>Glyphify — Unicode, symbols & emotes</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <main id="explore">
+        <section class="hero">
+          <div class="eyebrow"><span class="pulse"></span> 4,219 glyphs & counting</div>
+          <h1>Say it<br /><em>without pixels.</em></h1>
+          <p class="hero-copy">A tiny, joyful library of Unicode symbols, pictographs, and emotes — ready to copy into your next idea.</p>
+          <div class="search-wrap">
+            <span class="search-icon">⌕</span>
+            <input id="search" type="search" placeholder="Search stars, arrows, weather..." autocomplete="off" />
+            <kbd>/</kbd>
+          </div>
+        </section>
+
+        <section class="workspace" aria-label="Glyph browser">
+          <aside class="sidebar">
+            <div class="sidebar-heading">Browse the collection</div>
+            <div id="category-list" class="category-list"></div>
+            <div class="sidebar-note"><span class="note-icon">✦</span><div><strong>Made of text</strong><br />No SVGs. No downloads. Just characters.</div></div>
+          </aside>
+          <section class="library">
+            <div class="library-toolbar">
+              <div><div class="section-kicker">The collection</div><h2 id="collection-title">All glyphs <span id="result-count">0</span></h2></div>
+              <div class="toolbar-actions"><button id="random-button" class="text-button" type="button"><span>⤨</span> Surprise me</button><label class="sort-control">Sort <select id="sort-select"><option value="name">Name</option><option value="code">Code point</option><option value="glyph">Glyph</option></select></label></div>
+            </div>
+            <div id="glyph-grid" class="glyph-grid"></div>
+            <div id="empty-state" class="empty-state" hidden><span>◌</span><h3>No glyphs found</h3><p>Try a different word or browse another mood.</p></div>
+          </section>
+        </section>
+      </main>
+
+    </div>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <dialog id="glyph-dialog" class="glyph-dialog">
+      <button id="dialog-close" class="dialog-close" type="button" aria-label="Close details">×</button>
+      <div id="dialog-glyph" class="dialog-glyph"></div>
+      <div id="dialog-name" class="dialog-name"></div>
+      <div id="dialog-meta" class="dialog-meta"></div>
+      <div class="dialog-actions">
+        <button id="copy-character" class="dialog-action primary" type="button">Copy character</button>
+        <button id="copy-code" class="dialog-action" type="button">Copy code point</button>
+      </div>
+    </dialog>
+    <script src="script.js"></script>
+  </body>
+</html>
