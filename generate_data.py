@@ -244,6 +244,8 @@ def build_catalog() -> tuple[list[list[object]], list[list[str]]]:
     semantic_blocks = {}
     for item in visible_catalog:
         label = str(item[2])
+        if label == "Uncategorized":
+            continue
         if label not in semantic_labels:
             semantic_labels.append(label)
             semantic_representatives[label] = str(item[0])
@@ -328,7 +330,7 @@ function categoryMatches(item, option) {
 function categoryIcon(option) {
   return renderableGlyphs.find((item) => categoryMatches(item, option))[0];
 }
-const visibleSidebarOptions = sidebarOptions.filter((option) => renderableGlyphs.some((item) => categoryMatches(item, option)));
+const visibleSidebarOptions = sidebarOptions.filter((option) => option[2] !== "Uncategorized" && renderableGlyphs.some((item) => categoryMatches(item, option)));
 function renderCategories() {
   document.querySelector("#category-list").innerHTML = visibleSidebarOptions.map((option) => `<button class="category-button ${option[0] === activeCategory ? "active" : ""}" data-category="${option[0]}" type="button"><span class="category-icon">${categoryIcon(option)}</span><span>${option[2]}</span></button>`).join("");
   document.querySelectorAll(".category-button").forEach((button) => button.addEventListener("click", () => { activeCategory = button.dataset.category; renderCategories(); renderGlyphs(); }));
