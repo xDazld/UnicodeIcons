@@ -14,6 +14,7 @@ SOURCES = {
     "UnicodeData.txt": UNICODE_BASE + "UnicodeData.txt",
     "Blocks.txt": UNICODE_BASE + "Blocks.txt",
     "Categories.txt": "https://www.unicode.org/notes/tn36/Categories.txt",
+    "emoji-data.txt": UNICODE_BASE + "emoji/emoji-data.txt",
 }
 COMPOSE_PATH = Path("/usr/share/X11/locale/en_US.UTF-8/Compose")
 
@@ -54,61 +55,6 @@ SOURCE_RANGES = (
     (0x1CC00, 0x1CEBF),
     (0x13000, 0x1342F),
 )
-
-SEMANTIC_ICONS = {
-    "Animal": "🐾",
-    "Beverage": "☕",
-    "Bird": "🐦",
-    "Food": "🍴",
-    "Fruit": "🍎",
-    "Plant": "🌿",
-    "Weather": "☁",
-    "Emoticon": "☺",
-    "Arrows": "➜",
-    "Symbols": "✦",
-    "Pictographs & emotes": "☺",
-    "Emotes & people": "☻",
-    "Animals & nature": "☘",
-    "Food & drink": "🍎",
-    "Places & travel": "✈",
-    "Objects": "⚙",
-    "Games & cards": "♟",
-    "Shapes & marks": "◆",
-    "Math & numbers": "∑",
-    "Technical": "⌘",
-    "Music": "♫",
-    "Dingbats & ornaments": "❖",
-}
-
-FAMILY_ICONS = {
-    "Alchemical Symbols": "⚗",
-    "Arrows": "➜",
-    "Block Elements": "▉",
-    "Box Drawing": "▦",
-    "Chess Symbols": "♟",
-    "Currency Symbols": "¤",
-    "Dingbats": "❖",
-    "Domino Tiles": "🁫",
-    "Egyptian Hieroglyphs": "𓂀",
-    "Enclosed Alphanumerics": "ⓐ",
-    "Geometric Shapes": "◆",
-    "Letterlike Symbols": "℗",
-    "Mahjong Tiles": "🀄",
-    "Mathematical Operators": "∑",
-    "Miscellaneous Mathematical Symbols": "◈",
-    "Miscellaneous Symbols": "☼",
-    "Miscellaneous Symbols and Arrows": "⟲",
-    "Miscellaneous Symbols and Pictographs": "🌈",
-    "Miscellaneous Technical": "⌘",
-    "Musical Symbols": "♫",
-    "Number Forms": "½",
-    "Ornamental Dingbats": "❈",
-    "Playing Cards": "🂡",
-    "Symbols and Pictographs": "🫨",
-    "Symbols for Legacy Computing": "⌨",
-    "Transport and Map Symbols": "✈",
-}
-
 
 def fetch(name: str) -> str:
     request = urllib.request.Request(SOURCES[name], headers={"User-Agent": "Glyphify data generator"})
@@ -153,6 +99,22 @@ def parse_categories(text: str) -> dict[int, list[str]]:
         if len(fields) >= 7:
             categories[int(fields[0], 16)] = fields
     return categories
+
+
+def parse_emoji_presentation(text: str) -> set[int]:
+    codepoints = set()
+    for line in text.splitlines():
+        line = line.split("#", 1)[0].strip()
+        if not line or ";" not in line:
+            continue
+        span, property_name = (part.strip() for part in line.split(";", 1))
+        if property_name != "Emoji_Presentation":
+            continue
+        start, _, end = span.partition("..")
+        first = int(start, 16)
+        last = int(end, 16) if end else first
+        codepoints.update(range(first, last + 1))
+    return codepoints
 
 
 def block_for(codepoint: int, blocks: list[tuple[int, int, str]]) -> str:
@@ -242,6 +204,7 @@ def build_catalog() -> tuple[list[list[object]], list[list[str]]]:
     unicode_data = parse_unicode_data(fetch("UnicodeData.txt"))
     blocks = parse_blocks(fetch("Blocks.txt"))
     categories = parse_categories(fetch("Categories.txt"))
+    emoji_presentation = parse_emoji_presentation(fetch("emoji-data.txt"))
     compose = parse_compose()
     catalog: list[list[object]] = []
     seen: set[str] = set()
@@ -267,16 +230,19 @@ def build_catalog() -> tuple[list[list[object]], list[list[str]]]:
                 semantic,
                 compose.get(character, []),
                 block == "Egyptian Hieroglyphs",
+                codepoint in emoji_presentation,
             ])
             seen.add(code)
 
     normalize_semantic_labels(catalog)
     catalog.sort(key=lambda item: (str(item[5]), str(item[1]), str(item[3])))
-    semantic_options = [["all", "✳", "All glyphs", "all", "all"]]
+    visible_catalog = [item for item in catalog if not item[8] and not item[9]]
+    all_representative = str(visible_catalog[0][0])
+    semantic_options = [["all", all_representative, "Colorable glyphs", "all", "all"]]
     semantic_labels = []
     semantic_representatives = {}
     semantic_blocks = {}
-    for item in catalog:
+    for item in visible_catalog:
         label = str(item[2])
         if label not in semantic_labels:
             semantic_labels.append(label)
@@ -288,30 +254,32 @@ def build_catalog() -> tuple[list[list[object]], list[list[str]]]:
             continue
         semantic_options.append([
             f"meaning:{label}",
-            SEMANTIC_ICONS.get(label, semantic_representatives[label]),
+            semantic_representatives[label],
             label,
             "semantic",
             label,
         ])
 
     families = []
-    for item in catalog:
+    family_representatives = {}
+    for item in visible_catalog:
         family = str(item[5])
         if family not in families:
             families.append(family)
+            family_representatives[family] = str(item[0])
 
     options = semantic_options[:]
     for family in families:
         if family == "Arrows":
             option_index = next((index for index, option in enumerate(options) if option[2] == "Arrows"), None)
             if option_index is not None:
-                options[option_index] = ["union:Arrows", "➜", "Arrows", "union", ["Arrows", "Arrows"]]
+                options[option_index] = ["union:Arrows", family_representatives[family], "Arrows", "union", ["Arrows", "Arrows"]]
         elif family == "Symbols":
             option_index = next((index for index, option in enumerate(options) if option[2] == "Symbols"), None)
             if option_index is not None:
-                options[option_index] = ["union:Symbols", "✦", "Symbols", "union", ["Symbols", "Symbols"]]
+                options[option_index] = ["union:Symbols", family_representatives[family], "Symbols", "union", ["Symbols", "Symbols"]]
         elif family not in {option[2] for option in options}:
-            options.append([f"block:{family}", FAMILY_ICONS.get(family, "◈"), family, "block", family])
+            options.append([f"block:{family}", family_representatives[family], family, "block", family])
     return catalog, options
 
 
@@ -348,19 +316,31 @@ function canRenderGlyph(glyph) {
   const bitmap = new Uint32Array(renderContext.getImageData(0, 0, renderProbe.width, renderProbe.height).data.buffer);
   return bitmap.some((pixel, index) => pixel !== missingGlyphBitmap[index]);
 }
-const renderableGlyphs = glyphs.filter((item) => canRenderGlyph(item[0]));
+const renderableGlyphs = glyphs.filter((item) => canRenderGlyph(item[0]) && !item[8] && !item[9]);
+function categoryMatches(item, option) {
+  const [, , category, , , blockFamily] = item;
+  const [, , , kind, value] = option;
+  if (kind === "all") return true;
+  if (kind === "union") return category === value[0] || blockFamily === value[1];
+  if (kind === "semantic") return category === value;
+  return blockFamily === value;
+}
+function categoryIcon(option) {
+  return renderableGlyphs.find((item) => categoryMatches(item, option))[0];
+}
+const visibleSidebarOptions = sidebarOptions.filter((option) => renderableGlyphs.some((item) => categoryMatches(item, option)));
 function renderCategories() {
-  document.querySelector("#category-list").innerHTML = sidebarOptions.map(([id, icon, label]) => `<button class="category-button ${id === activeCategory ? "active" : ""}" data-category="${id}" type="button"><span class="category-icon">${icon}</span><span>${label}</span></button>`).join("");
+  document.querySelector("#category-list").innerHTML = visibleSidebarOptions.map((option) => `<button class="category-button ${option[0] === activeCategory ? "active" : ""}" data-category="${option[0]}" type="button"><span class="category-icon">${categoryIcon(option)}</span><span>${option[2]}</span></button>`).join("");
   document.querySelectorAll(".category-button").forEach((button) => button.addEventListener("click", () => { activeCategory = button.dataset.category; renderCategories(); renderGlyphs(); }));
 }
 function visibleGlyphs() {
   const query = searchInput.value.trim().toLowerCase();
-  const active = sidebarOptions.find(([id]) => id === activeCategory);
+  const active = visibleSidebarOptions.find(([id]) => id === activeCategory);
   return renderableGlyphs.filter((item) => {
     const [, name, category, code, block, blockFamily, , composeSequences] = item;
-    const matchesCategory = activeCategory === "all" ? !item[8] : (active[3] === "union" ? (category === active[4][0] || blockFamily === active[4][1]) : active[3] === "semantic" ? category === active[4] : blockFamily === active[4]);
+    const matchesActiveCategory = activeCategory === "all" ? true : categoryMatches(item, active);
     const composeText = composeSequences.join(" ").toLowerCase();
-    return matchesCategory && (!query || name.includes(query) || category.toLowerCase().includes(query) || block.toLowerCase().includes(query) || blockFamily.toLowerCase().includes(query) || code.toLowerCase().includes(query) || composeText.includes(query));
+    return matchesActiveCategory && (!query || name.includes(query) || category.toLowerCase().includes(query) || block.toLowerCase().includes(query) || blockFamily.toLowerCase().includes(query) || code.toLowerCase().includes(query) || composeText.includes(query));
   });
 }
 function renderGlyphCard(item) {
@@ -373,7 +353,7 @@ function renderGlyphs() {
     if (sortSelect.value === "code") return a[3].localeCompare(b[3], undefined, { numeric: true });
     if (sortSelect.value === "glyph") return a[0].localeCompare(b[0]);
     return a[1].localeCompare(b[1]);
-  }); const option = sidebarOptions.find(([id]) => id === activeCategory);
+  }); const option = visibleSidebarOptions.find(([id]) => id === activeCategory);
   title.firstChild.textContent = `${option[2]} `; count.textContent = items.length.toLocaleString(); empty.hidden = items.length > 0;
   grid.innerHTML = items.map(renderGlyphCard).join("");
   grid.querySelectorAll(".glyph-card").forEach((card) => {
@@ -401,7 +381,7 @@ searchInput.addEventListener("input", renderGlyphs);
 sortSelect.addEventListener("change", renderGlyphs);
 document.querySelector("#random-button").addEventListener("click", () => { const items = visibleGlyphs(); if (items.length) { const item = items[Math.floor(Math.random() * items.length)]; copyGlyph(item[0], item[1], item[3]); } });
 document.addEventListener("keydown", (event) => { if (event.key === "/" && document.activeElement !== searchInput) { event.preventDefault(); searchInput.focus(); } });
-document.querySelector(".eyebrow").innerHTML = `<span class="pulse"></span> ${renderableGlyphs.filter((item) => !item[8]).length.toLocaleString()} glyphs grouped by meaning and Unicode family`;
+document.querySelector(".eyebrow").innerHTML = `<span class="pulse"></span> ${renderableGlyphs.length.toLocaleString()} colorable glyphs grouped by meaning and Unicode family`;
 renderCategories(); renderGlyphs();
 '''
 
@@ -415,8 +395,8 @@ def main() -> None:
         + output,
         encoding="utf-8",
     )
-    included = sum(not bool(item[8]) for item in catalog)
-    print(f"Generated script.js: {len(catalog)} catalog entries ({included} in All glyphs), {len(options) - 1} filters.")
+    included = sum(not bool(item[8]) and not bool(item[9]) for item in catalog)
+    print(f"Generated script.js: {len(catalog)} catalog entries ({included} colorable glyphs), {len(options) - 1} filters.")
 
 
 if __name__ == "__main__":
