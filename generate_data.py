@@ -54,6 +54,7 @@ SOURCE_RANGES = (
     (0x1FB00, 0x1FBFF),
     (0x1CC00, 0x1CEBF),
     (0x13000, 0x1342F),
+    (0x13460, 0x143FF),
 )
 
 def fetch(name: str) -> str:
@@ -134,7 +135,7 @@ def family_for(block: str) -> str:
     }
     if block in aliases:
         return aliases[block]
-    return re.sub(r"-[A-C]$| Extended$", "", block)
+    return re.sub(r"(?:-[A-C]| Extended(?:-[A-C])?)$", "", block)
 
 
 def semantic_for(fields: list[str] | None, block: str) -> str:
@@ -229,7 +230,7 @@ def build_catalog() -> tuple[list[list[object]], list[list[str]]]:
                 family_for(block),
                 semantic,
                 compose.get(character, []),
-                block == "Egyptian Hieroglyphs",
+                False,
                 codepoint in emoji_presentation,
             ])
             seen.add(code)
