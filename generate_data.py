@@ -55,6 +55,8 @@ SOURCE_RANGES = (
     (0x1CC00, 0x1CEBF),
     (0x13000, 0x1342F),
     (0x13460, 0x143FF),
+    (0x10980, 0x1099F),
+    (0x14400, 0x1467F),
 )
 
 def fetch(name: str) -> str:
@@ -242,7 +244,6 @@ def build_catalog() -> tuple[list[list[object]], list[list[str]]]:
     semantic_options = [["all", all_representative, "Colorable glyphs", "all", "all"]]
     semantic_labels = []
     semantic_representatives = {}
-    semantic_blocks = {}
     for item in visible_catalog:
         label = str(item[2])
         if label == "Uncategorized":
@@ -250,11 +251,7 @@ def build_catalog() -> tuple[list[list[object]], list[list[str]]]:
         if label not in semantic_labels:
             semantic_labels.append(label)
             semantic_representatives[label] = str(item[0])
-            semantic_blocks[label] = set()
-        semantic_blocks[label].add(str(item[4]))
     for label in semantic_labels:
-        if semantic_blocks[label] == {"Egyptian Hieroglyphs"}:
-            continue
         semantic_options.append([
             f"meaning:{label}",
             semantic_representatives[label],
@@ -299,7 +296,9 @@ const dialogGlyph = document.querySelector("#dialog-glyph");
 const dialogName = document.querySelector("#dialog-name");
 const dialogMeta = document.querySelector("#dialog-meta");
 const sortSelect = document.querySelector("#sort-select");
+const tabButtons = document.querySelectorAll(".tab-button");
 let activeCategory = "all";
+let activeTab = "symbols";
 const favorites = new Set();
 const renderProbe = document.createElement("canvas");
 renderProbe.width = 64;
@@ -320,6 +319,10 @@ function canRenderGlyph(glyph) {
   return bitmap.some((pixel, index) => pixel !== missingGlyphBitmap[index]);
 }
 const renderableGlyphs = glyphs.filter((item) => canRenderGlyph(item[0]) && !item[8] && !item[9]);
+const hieroglyphBlocks = new Set(["Egyptian Hieroglyphs", "Egyptian Hieroglyphs Extended-A", "Meroitic Hieroglyphs", "Anatolian Hieroglyphs"]);
+function tabGlyphs() {
+  return renderableGlyphs.filter((item) => activeTab === "hieroglyphs" ? hieroglyphBlocks.has(item[4]) : !hieroglyphBlocks.has(item[4]));
+}
 function categoryMatches(item, option) {
   const [, , category, , , blockFamily] = item;
   const [, , , kind, value] = option;
@@ -329,17 +332,22 @@ function categoryMatches(item, option) {
   return blockFamily === value;
 }
 function categoryIcon(option) {
-  return renderableGlyphs.find((item) => categoryMatches(item, option))[0];
+  return tabGlyphs().find((item) => categoryMatches(item, option))[0];
 }
-const visibleSidebarOptions = sidebarOptions.filter((option) => option[2] !== "Uncategorized" && renderableGlyphs.some((item) => categoryMatches(item, option)));
+function visibleSidebarOptions() {
+  return sidebarOptions.filter((option) => option[2] !== "Uncategorized" && tabGlyphs().some((item) => categoryMatches(item, option)));
+}
 function renderCategories() {
-  document.querySelector("#category-list").innerHTML = visibleSidebarOptions.map((option) => `<button class="category-button ${option[0] === activeCategory ? "active" : ""}" data-category="${option[0]}" type="button"><span class="category-icon">${categoryIcon(option)}</span><span>${option[2]}</span></button>`).join("");
+  const options = visibleSidebarOptions();
+  if (!options.some(([id]) => id === activeCategory)) activeCategory = "all";
+  document.querySelector("#category-list").innerHTML = options.map((option) => `<button class="category-button ${option[0] === activeCategory ? "active" : ""}" data-category="${option[0]}" type="button"><span class="category-icon">${categoryIcon(option)}</span><span>${option[2]}</span></button>`).join("");
   document.querySelectorAll(".category-button").forEach((button) => button.addEventListener("click", () => { activeCategory = button.dataset.category; renderCategories(); renderGlyphs(); }));
 }
 function visibleGlyphs() {
   const query = searchInput.value.trim().toLowerCase();
-  const active = visibleSidebarOptions.find(([id]) => id === activeCategory);
-  return renderableGlyphs.filter((item) => {
+  const options = visibleSidebarOptions();
+  const active = options.find(([id]) => id === activeCategory);
+  return tabGlyphs().filter((item) => {
     const [, name, category, code, block, blockFamily, , composeSequences] = item;
     const matchesActiveCategory = activeCategory === "all" ? true : categoryMatches(item, active);
     const composeText = composeSequences.join(" ").toLowerCase();
@@ -356,7 +364,7 @@ function renderGlyphs() {
     if (sortSelect.value === "code") return a[3].localeCompare(b[3], undefined, { numeric: true });
     if (sortSelect.value === "glyph") return a[0].localeCompare(b[0]);
     return a[1].localeCompare(b[1]);
-  }); const option = visibleSidebarOptions.find(([id]) => id === activeCategory);
+  }); const option = visibleSidebarOptions().find(([id]) => id === activeCategory) || sidebarOptions[0];
   title.firstChild.textContent = `${option[2]} `; count.textContent = items.length.toLocaleString(); empty.hidden = items.length > 0;
   grid.innerHTML = items.map(renderGlyphCard).join("");
   grid.querySelectorAll(".glyph-card").forEach((card) => {
@@ -380,6 +388,13 @@ async function copyText(value) { try { await navigator.clipboard.writeText(value
 document.querySelector("#dialog-close").addEventListener("click", () => dialog.close());
 dialog.addEventListener("click", (event) => { if (event.target === dialog) dialog.close(); });
 document.addEventListener("keydown", (event) => { if (event.key === "Escape" && dialog.open) dialog.close(); });
+tabButtons.forEach((button) => button.addEventListener("click", () => {
+  activeTab = button.dataset.tab;
+  activeCategory = "all";
+  tabButtons.forEach((tab) => { const selected = tab === button; tab.classList.toggle("active", selected); tab.setAttribute("aria-selected", selected ? "true" : "false"); });
+  renderCategories();
+  renderGlyphs();
+}));
 searchInput.addEventListener("input", renderGlyphs);
 sortSelect.addEventListener("change", renderGlyphs);
 document.querySelector("#random-button").addEventListener("click", () => { const items = visibleGlyphs(); if (items.length) { const item = items[Math.floor(Math.random() * items.length)]; copyGlyph(item[0], item[1], item[3]); } });

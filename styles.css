@@ -33,6 +33,10 @@ h1 em { color: var(--warm); font-style: normal; }
 .search-icon { color: var(--accent); font-size: 30px; line-height: 1; margin-right: 10px; transform: rotate(-20deg); }
 .search-wrap input { width: 100%; border: 0; outline: 0; color: var(--ink); background: transparent; font-size: 14px; }
 .search-wrap input::placeholder { color: var(--placeholder); }
+.tab-list { display: flex; gap: 7px; margin-top: 24px; }
+.tab-button { padding: 9px 16px; color: var(--muted); background: transparent; border: 1px solid var(--line); border-radius: 999px; font-size: 12px; cursor: pointer; }
+.tab-button:hover { color: var(--ink); border-color: var(--hover-border); }
+.tab-button.active { color: var(--canvas); background: var(--accent); border-color: var(--accent); font-weight: 600; }
 kbd { color: var(--placeholder); border: 1px solid var(--search-border); border-radius: 5px; padding: 3px 7px; font-size: 12px; }
 .workspace { display: grid; grid-template-columns: 190px 1fr; gap: 68px; border-top: 1px solid var(--line); padding-top: 48px; }
 .sidebar-heading { color: var(--muted); margin-bottom: 21px; }
